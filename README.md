@@ -21,7 +21,7 @@ A responsive, zero-dependency, single-file web application that allows users to 
 
 ## 🚀 How to Run
 
-Because **Pin to Address** is built as a single, self-contained HTML file, running it is instantaneous:
+Click the GitHub page URL or follow these steps:
 
 1. Download or clone this repository:
    ```bash
