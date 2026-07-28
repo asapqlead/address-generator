@@ -1,0 +1,9 @@
+# Agent & AI Customization Roots
+.agents/
+.gemini/
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

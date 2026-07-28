@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pin to Address — Precision Interactive Geocoder</title>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS via CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  
+  <!-- Inline CSS: Semantic Design System & Responsive Layout -->
+  <style>
+    :root {
+      /* Primitive & Semantic Design Tokens */
+      --color-primary: hsl(221, 83%, 53%);
+      --color-primary-hover: hsl(221, 83%, 47%);
+      --color-primary-light: hsl(221, 83%, 96%);
+      
+      --color-success: hsl(142, 71%, 42%);
+      --color-success-bg: hsl(142, 76%, 95%);
+      --color-warning: hsl(38, 92%, 50%);
+      --color-warning-bg: hsl(48, 96%, 92%);
+      --color-error: hsl(0, 84%, 60%);
+      --color-error-bg: hsl(0, 86%, 97%);
+      
+      --color-bg-main: hsl(210, 20%, 98%);
+      --color-surface: hsl(0, 0%, 100%);
+      --color-surface-translucent: rgba(255, 255, 255, 0.86);
+      --color-border: hsl(214, 28%, 89%);
+      --color-divider: hsl(214, 20%, 93%);
+      
+      --color-text-primary: hsl(218, 23%, 16%);
+      --color-text-secondary: hsl(215, 16%, 47%);
+      --color-text-muted: hsl(215, 14%, 65%);
+      
+      --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 12px 20px -4px rgba(15, 23, 42, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.06);
+      
+      --radius-sm: 0.4rem;
+      --radius-md: 0.625rem;
+      --radius-lg: 1rem;
+      --radius-pill: 9999px;
+      
+      --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Dark Mode Theme Adjustments */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-primary: hsl(217, 91%, 60%);
+        --color-primary-hover: hsl(217, 91%, 67%);
+        --color-primary-light: hsla(217, 91%, 60%, 0.15);
+        
+        --color-bg-main: hsl(222, 47%, 7%);
+        --color-surface: hsl(222, 43%, 11%);
+        --color-surface-translucent: rgba(15, 23, 42, 0.86);
+        --color-border: hsl(217, 28%, 20%);
+        --color-divider: hsl(217, 24%, 18%);
+        
+        --color-text-primary: hsl(210, 40%, 98%);
+        --color-text-secondary: hsl(215, 20%, 72%);
+        --color-text-muted: hsl(215, 15%, 52%);
+        
+        --shadow-lg: 0 15px 30px -6px rgba(0, 0, 0, 0.65);
+      }
+    }
+
+    /* Reset & Base Styling */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-family); background-color: var(--color-bg-main); color: var(--color-text-primary); -webkit-font-smoothing: antialiased; }
+
+    /* App Container & Map Area */
+    .app-container { position: relative; width: 100vw; height: 100dvh; }
+    .map-wrapper { position: absolute; inset: 0; z-index: 1; }
+    #map { width: 100%; height: 100%; background-color: hsl(215, 25%, 90%); cursor: crosshair; }
+    #map.map-locked { cursor: not-allowed !important; }
+
+    /* Modular Layout: 1. Floating Brand Header Bar (Top-Left) */
+    .brand-header {
+      position: absolute;
+      top: 1.25rem;
+      left: 1.25rem;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      background: var(--color-surface-translucent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 0.5rem 0.875rem 0.5rem 0.625rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-md);
+      pointer-events: auto;
+    }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.875rem;
+      height: 1.875rem;
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .brand-title h1 {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    /* Debounce / Cooldown Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-pill);
+      font-size: 0.7rem;
+      font-weight: 600;
+      background-color: var(--color-warning-bg);
+      color: var(--color-warning);
+      opacity: 0;
+      max-width: 0;
+      overflow: hidden;
+      transition: all var(--transition-normal);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .status-badge.active {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 0.25rem;
+    }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: currentColor;
+      flex-shrink: 0;
+      animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+    @keyframes ping { 75%, 100% { transform: scale(1.8); opacity: 0; } }
+
+    /* Modular Layout: 2. Map Controls (Top-Right) */
+    .map-controls {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .control-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: var(--radius-pill);
+      background: var(--color-surface-translucent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-md);
+      color: var(--color-text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .control-btn:hover { color: var(--color-primary); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+    .control-btn:active { transform: scale(0.96); }
+    .control-btn.locating { animation: pulse 1.2s ease-in-out infinite; color: var(--color-primary); }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.92); opacity: 0.7; } }
+
+    /* Modular Layout: 3. Compact Location & Results Card (Bottom) */
+    .results-container {
+      position: absolute;
+      bottom: 2.25rem;
+      left: 1.25rem;
+      width: 340px;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+    }
+    .results-card {
+      pointer-events: auto;
+      background: var(--color-surface-translucent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      padding: 1rem;
+      transition: transform var(--transition-normal), opacity var(--transition-normal);
+    }
+
+    .state-view {
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+      animation: fadeIn var(--transition-fast) forwards;
+    }
+    .state-view.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Compact States (Empty Prompt, Loading, Error) */
+    .compact-prompt, .compact-error {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.25rem 0;
+    }
+    .prompt-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: var(--radius-md);
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .prompt-text, .error-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+    }
+    .prompt-text strong, .error-details strong { font-size: 0.875rem; font-weight: 600; color: var(--color-text-primary); }
+    .prompt-text span, .error-details span { font-size: 0.75rem; color: var(--color-text-secondary); line-height: 1.35; }
+
+    .compact-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      color: var(--color-text-secondary);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .spinner {
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2.5px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 750ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .compact-error { color: var(--color-error); }
+    .compact-error svg { flex-shrink: 0; color: var(--color-error); }
+
+    /* State 4: Streamlined Results & Fields */
+    .field-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .field-header { display: flex; align-items: center; justify-content: space-between; }
+    .field-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+    .cache-pill { font-size: 0.65rem; font-weight: 700; background: var(--color-primary-light); color: var(--color-primary); padding: 0.1rem 0.4rem; border-radius: var(--radius-pill); display: none; text-transform: uppercase; letter-spacing: 0.03em; }
+    .cache-pill.visible { display: inline-block; }
+
+    .address-input-wrapper {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .address-box {
+      width: 100%;
+      height: 3.6rem;
+      min-height: 3.6rem;
+      max-height: 5rem;
+      padding: 0.5rem 0.625rem;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      color: var(--color-text-primary);
+      font-size: 0.875rem;
+      font-weight: 500;
+      line-height: 1.4;
+      resize: none;
+      user-select: text;
+      transition: border-color var(--transition-fast);
+    }
+    .address-box:focus { outline: none; border-color: var(--color-primary); }
+
+    /* Compact Rows & Dividers */
+    .divider { height: 1px; background-color: var(--color-divider); margin: 0.1rem 0; border: none; }
+    .field-wrapper, .coords-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--color-surface);
+      padding: 0.35rem 0.4rem 0.35rem 0.625rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      height: 2.25rem;
+    }
+    .coords-wrapper { background: var(--color-bg-main); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.75rem; color: var(--color-text-secondary); }
+    .field-input { background: transparent; border: none; outline: none; font-family: inherit; font-size: 0.8125rem; font-weight: 600; color: var(--color-text-primary); width: calc(100% - 4.5rem); text-overflow: ellipsis; overflow: hidden; user-select: text; }
+    .coords-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+
+    /* Responsive Button Styling */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; padding: 0.4rem 0.75rem; font-family: inherit; font-size: 0.8125rem; font-weight: 600; border-radius: var(--radius-sm); border: none; cursor: pointer; transition: all var(--transition-fast); user-select: none; text-decoration: none; min-height: 2.25rem; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background-color: var(--color-primary); color: #ffffff; box-shadow: var(--shadow-sm); }
+    .btn-primary:hover { background-color: var(--color-primary-hover); }
+    .btn-primary.copied { background-color: var(--color-success); color: #ffffff; }
+
+    .btn-mini { padding: 0.2rem 0.5rem; font-size: 0.7rem; font-weight: 600; min-height: 1.6rem; background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+    .btn-mini:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .btn-mini.copied { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success); }
+
+    /* Unobtrusive Attribution Line */
+    .app-attribution {
+      position: absolute;
+      bottom: 0.5rem;
+      left: 1.25rem;
+      z-index: 10;
+      font-size: 0.6875rem;
+      color: var(--color-text-muted);
+      pointer-events: auto;
+    }
+    .app-attribution a { color: var(--color-text-secondary); text-decoration: underline; transition: color var(--transition-fast); }
+    .app-attribution a:hover { color: var(--color-primary); }
+
+    /* Custom Leaflet Pin Animation */
+    .custom-map-pin { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)); transition: transform var(--transition-fast); animation: pinDrop 350ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .custom-map-pin svg { width: 36px; height: 36px; fill: var(--color-primary); }
+    .custom-map-pin.loading-halo::after { content: ""; position: absolute; width: 44px; height: 44px; border: 2px dashed var(--color-primary); border-radius: 50%; animation: spin 2s linear infinite; }
+    @keyframes pinDrop { 0% { transform: translateY(-30px) scale(0.6); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+
+    /* Mobile Responsive Overrides */
+    @media (max-width: 768px) {
+      .brand-header { top: 0.75rem; left: 0.75rem; padding: 0.4rem 0.75rem 0.4rem 0.5rem; }
+      .brand-logo { width: 1.6rem; height: 1.6rem; }
+      .brand-logo svg { width: 16px; height: 16px; }
+      .brand-title h1 { font-size: 0.875rem; }
+      .map-controls { top: 0.75rem; right: 0.75rem; }
+      .control-btn { width: 2.25rem; height: 2.25rem; }
+      
+      .results-container {
+        bottom: 0.75rem;
+        left: 0.75rem;
+        right: 0.75rem;
+        width: calc(100% - 1.5rem);
+      }
+      .results-card {
+        padding: 0.875rem;
+        max-height: 58dvh;
+        overflow-y: auto;
+        border-radius: var(--radius-lg);
+      }
+      .app-attribution { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Interactive Map Container -->
+    <div class="map-wrapper">
+      <div id="map" aria-label="Interactive Map for Reverse Geocoding"></div>
+    </div>
+
+    <!-- 1. Floating Brand Header Bar -->
+    <header class="brand-header">
+      <div class="brand-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+      </div>
+      <div class="brand-title">
+        <h1>Pin to Address</h1>
+      </div>
+      <!-- Debounce/Rate-Limit Indicator -->
+      <div id="status-badge" class="status-badge" role="status" aria-hidden="true">
+        <span class="pulse-dot"></span>
+        <span>Locked (1.2s)</span>
+      </div>
+    </header>
+
+    <!-- 2. Floating Map Controls -->
+    <div class="map-controls">
+      <button class="control-btn" id="locate-btn" title="Locate my exact coordinates" aria-label="Center on my location">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- 3. Compact Location & Results Panel -->
+    <div class="results-container">
+      <div class="results-card" role="region" aria-live="polite" aria-atomic="true">
+        
+        <!-- State 1: Initial Empty Prompt -->
+        <div id="state-empty" class="state-view active">
+          <div class="compact-prompt">
+            <div class="prompt-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </div>
+            <div class="prompt-text">
+              <strong>Tap anywhere on the map</strong>
+              <span>Drop a pin to get formatted street address & postal code.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- State 2: Loading State -->
+        <div id="state-loading" class="state-view">
+          <div class="compact-loading">
+            <div class="spinner"></div>
+            <span id="loading-msg">Resolving address from coordinates...</span>
+          </div>
+        </div>
+
+        <!-- State 3: Error State -->
+        <div id="state-error" class="state-view">
+          <div class="compact-error">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <div class="error-details">
+              <strong id="error-title">Geocoding Failed</strong>
+              <span id="error-desc">Unable to find an address at this coordinate.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- State 4: Success Results -->
+        <div id="state-success" class="state-view">
+          
+          <!-- Formatted Address Field -->
+          <div class="field-group">
+            <div class="field-header">
+              <span class="field-label">Formatted Address</span>
+              <span id="cache-indicator" class="cache-pill" title="Loaded instantly from session memory">Cached</span>
+            </div>
+            <div class="address-input-wrapper">
+              <textarea id="formatted-address-box" class="address-box" readonly aria-label="Formatted address text"></textarea>
+              <button id="copy-address-btn" class="btn btn-primary" type="button" title="Copy Address">
+                <svg class="icon-copy" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <svg class="icon-check" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span id="copy-btn-text">Copy Address</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="postal-divider" class="divider"></div>
+
+          <!-- Postal Code Field -->
+          <div id="postal-section" class="field-group">
+            <span class="field-label">Postal / Zip Code</span>
+            <div class="field-wrapper">
+              <input type="text" id="postal-code-box" class="field-input" readonly value="—" aria-label="Postal or Zip Code" />
+              <button id="copy-postal-btn" class="btn btn-mini" type="button" title="Copy Postal Code">
+                <span>Copy</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Raw Coordinates Field -->
+          <div class="field-group">
+            <span class="field-label">Coordinates</span>
+            <div class="coords-wrapper">
+              <span id="coords-text" class="coords-text">Lat: —, Lng: —</span>
+              <button id="copy-coords-btn" class="btn btn-mini" type="button" title="Copy exact Lat, Lng">
+                <span>Copy</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Unobtrusive Footnote Attribution -->
+    <footer class="app-attribution">
+      <span>&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> &bull; Powered by Nominatim</span>
+    </footer>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Application Logic -->
+  <script>
+    /**
+     * NOMINATIM POLICY & COMPLIANCE CONFIGURATION
+     * 1. Nominatim's usage policy mandates clear identification of public-facing applications.
+     * 2. In modern web browsers, setting custom "User-Agent" headers in fetch() is forbidden by CORS/security specifications.
+     * 3. To remain compliant from client-side code, we pass descriptive identifying parameters ('email' and 'app_name') in the query string and preserve Referer headers.
+     * NOTE FOR PRODUCTION AT SCALE: If high traffic occurs, setting up a lightweight server-side API proxy (e.g. Cloudflare Worker or Netlify Function)
+     * is the recommended long-term solution to cache shared queries, throttle rate limits, and transmit an explicit HTTP User-Agent header cleanly.
+     */
+    const CONFIG = {
+      API_ENDPOINT: "https://nominatim.openstreetmap.org/reverse",
+      APP_IDENTIFIER: "PinToAddress_SingleFileTool_v1.0",
+      CONTACT_EMAIL: "support@pintoaddress.app", // Replace with your admin contact email in production
+      DEBOUNCE_MS: 1200,                        // 1.2 second lock between requests per Nominatim rate limits
+      TIMEOUT_MS: 8000,                         // 8 second request abort timeout
+      CACHE_PRECISION: 5                        // ~5 decimal places (~1.1 meter accuracy) for session caching
+    };
+
+    // District/commune/village level postal codes exist but aren't included here since they'd require scraping or a data source with an actual API, which this tool doesn't use.
+    const KH_PROVINCE_CODES = {
+      "Kandal": "08",
+      "Banteay Meanchey": "01",
+      "Battambang": "02",
+      "Kampong Cham": "03",
+      "Kampong Chhnang": "04",
+      "Kampong Speu": "05",
+      "Kampong Thom": "06",
+      "Kampot": "07",
+      "Koh Kong": "09",
+      "Kratie": "10",
+      "Mondul Kiri": "11",
+      "Preah Vihear": "13",
+      "Prey Veng": "14",
+      "Pursat": "15",
+      "Ratanak Kiri": "16",
+      "Siem Reap": "17",
+      "Preah Sihanouk": "18",
+      "Stung Treng": "19",
+      "Svay Rieng": "20",
+      "Takeo": "21",
+      "Oddar Meanchey": "22",
+      "Kep": "23",
+      "Pailin": "24",
+      "Tboung Khmum": "25",
+      "Phnom Penh": "12"
+    };
+
+    /**
+     * In-Memory Session Cache
+     * Stores responses keyed by rounded coordinates: "51.50500,-0.09000" -> { address, rawCoords }
+     */
+    const sessionCache = new Map();
+
+    /**
+     * Application State
+     */
+    const state = {
+      isLocked: false,
+      activeAbort: null,
+      marker: null,
+      map: null,
+      currentAddress: "",
+      currentPostalCode: "",
+      currentCoords: ""
+    };
+
+    /**
+     * DOM Elements
+     */
+    const ui = {
+      mapEl: document.getElementById('map'),
+      statusBadge: document.getElementById('status-badge'),
+      locateBtn: document.getElementById('locate-btn'),
+      
+      // States
+      stateEmpty: document.getElementById('state-empty'),
+      stateLoading: document.getElementById('state-loading'),
+      stateError: document.getElementById('state-error'),
+      stateSuccess: document.getElementById('state-success'),
+      
+      // Result Elements
+      addressBox: document.getElementById('formatted-address-box'),
+      postalBox: document.getElementById('postal-code-box'),
+      postalSection: document.getElementById('postal-section'),
+      postalDivider: document.getElementById('postal-divider'),
+      cacheIndicator: document.getElementById('cache-indicator'),
+      coordsText: document.getElementById('coords-text'),
+      copyAddressBtn: document.getElementById('copy-address-btn'),
+      copyAddressText: document.getElementById('copy-btn-text'),
+      copyPostalBtn: document.getElementById('copy-postal-btn'),
+      copyCoordsBtn: document.getElementById('copy-coords-btn'),
+      
+      // Icons
+      iconCopy: document.querySelector('.icon-copy'),
+      iconCheck: document.querySelector('.icon-check'),
+      
+      // Error Elements
+      errorTitle: document.getElementById('error-title'),
+      errorDesc: document.getElementById('error-desc')
+    };
+
+    /**
+     * Switch Visible UI Panel State
+     */
+    function switchState(targetState) {
+      [ui.stateEmpty, ui.stateLoading, ui.stateError, ui.stateSuccess].forEach(el => {
+        el.classList.remove('active');
+      });
+      targetState.classList.add('active');
+    }
+
+    /**
+     * Initialize Map & Custom Icons
+     */
+    function initMap() {
+      // Create map centered on a reasonable default world view (London metropolis for instant visual polish)
+      state.map = L.map('map', {
+        zoomControl: false // Reposited zoom controls to avoid clobbering UI panel
+      }).setView([51.505, -0.09], 12);
+
+      // Add Zoom Controls to Bottom Right (safe area on both mobile & desktop)
+      L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+
+      // Add OpenStreetMap Tile Layer with required policy attribution
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(state.map);
+
+      // Attempt User Geolocation on startup (gracefully fall back to default if denied)
+      attemptGeolocation(true);
+
+      // Map Click Event Listener (No autocomplete-as-you-type per Nominatim usage policy!)
+      state.map.on('click', handleMapClick);
+    }
+
+    /**
+     * Custom SVG Marker Icon Creation
+     */
+    function createCustomPinIcon(isLoading = false) {
+      const haloClass = isLoading ? 'loading-halo' : '';
+      const iconHtml = `
+        <div class="custom-map-pin ${haloClass}">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke="#ffffff" stroke-width="1.5">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+            <circle cx="12" cy="9" r="2.5" fill="#ffffff"/>
+          </svg>
+        </div>
+      `;
+      return L.divIcon({
+        className: 'custom-pin-wrapper',
+        html: iconHtml,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36],
+        popupAnchor: [0, -36]
+      });
+    }
+
+    /**
+     * Attempt Geolocation
+     * @param {boolean} isSilent - If true, fails without error toast on startup denial
+     */
+    function attemptGeolocation(isSilent = false) {
+      if (!navigator.geolocation) {
+        if (!isSilent) alert("Geolocation is not supported by your browser.");
+        return;
+      }
+
+      ui.locateBtn.classList.add('locating');
+      
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          state.map.setView([lat, lng], 15, { animate: true });
+          ui.locateBtn.classList.remove('locating');
+        },
+        (err) => {
+          ui.locateBtn.classList.remove('locating');
+          if (!isSilent) {
+            alert("Unable to access location. Please check browser location permissions.");
+          }
+        },
+        { timeout: 5000, maximumAge: 60000 }
+      );
+    }
+
+    /**
+     * Handle Explicit Map Click
+     */
+    function handleMapClick(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      // Check if click debouncing / rate lock is active
+      if (state.isLocked) {
+        // Visual shake or notice could occur; simply ignore request to prevent IP blacklisting
+        return;
+      }
+
+      // Drop or relocate marker
+      if (!state.marker) {
+        state.marker = L.marker([lat, lng], { icon: createCustomPinIcon(true) }).addTo(state.map);
+      } else {
+        state.marker.setLatLng([lat, lng]);
+        state.marker.setIcon(createCustomPinIcon(true));
+      }
+
+      // Trigger Geocode Operation
+      fetchReverseGeocode(lat, lng);
+    }
+
+    /**
+     * Trigger Reverse Geocoding with In-Memory Caching & Cooldown Lock
+     */
+    async function fetchReverseGeocode(lat, lng) {
+      const roundLat = Number(lat.toFixed(CONFIG.CACHE_PRECISION));
+      const roundLng = Number(lng.toFixed(CONFIG.CACHE_PRECISION));
+      const cacheKey = `${roundLat},${roundLng}`;
+      
+      state.currentCoords = `${roundLat.toFixed(CONFIG.CACHE_PRECISION)}, ${roundLng.toFixed(CONFIG.CACHE_PRECISION)}`;
+      
+      // 1. Check Session Cache First
+      if (sessionCache.has(cacheKey)) {
+        const cachedData = sessionCache.get(cacheKey);
+        state.marker.setIcon(createCustomPinIcon(false)); // Remove loading halo
+        displaySuccess(cachedData.formattedAddress, cachedData.postalCode, state.currentCoords, true);
+        return;
+      }
+
+      // 2. Not cached: Activate 1.2s Debounce Lock & Show Loading
+      activateRateLock();
+      switchState(ui.stateLoading);
+      ui.coordsText.textContent = `Lat: ${roundLat}, Lng: ${roundLng}`;
+
+      // Cancel any prior incomplete request
+      if (state.activeAbort) {
+        state.activeAbort.abort();
+      }
+      state.activeAbort = new AbortController();
+
+      // Build Nominatim URL with identifying compliance params
+      const url = new URL(CONFIG.API_ENDPOINT);
+      url.searchParams.set('format', 'jsonv2');
+      url.searchParams.set('lat', roundLat);
+      url.searchParams.set('lon', roundLng);
+      url.searchParams.set('addressdetails', '1');
+      url.searchParams.set('zoom', '18'); // Building/street level accuracy
+      url.searchParams.set('email', CONFIG.CONTACT_EMAIL);
+      url.searchParams.set('app', CONFIG.APP_IDENTIFIER);
+
+      try {
+        const timeoutId = setTimeout(() => state.activeAbort.abort(), CONFIG.TIMEOUT_MS);
+        
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Accept-Language': navigator.language || 'en-US,en;q=0.9'
+          },
+          signal: state.activeAbort.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+          // Nominatim returns an error object if no features found nearby (e.g. middle of ocean)
+          throw new Error(data.error || "No address found at this coordinate.");
+        }
+
+        // 3. Dynamically Parse & Format Address
+        const parsed = parseAddressObject(data.address || {});
+        const formattedAddress = parsed.addressText;
+        const postalCode = parsed.postalCode;
+        
+        if (!formattedAddress && !postalCode) {
+          throw new Error("No readable address fields returned for this remote coordinate.");
+        }
+
+        // Save to Session Cache
+        sessionCache.set(cacheKey, { formattedAddress: formattedAddress || "No Street Address Available", postalCode });
+        
+        // Display Success
+        state.marker.setIcon(createCustomPinIcon(false));
+        displaySuccess(formattedAddress || "No Street Address Available", postalCode, state.currentCoords, false);
+
+      } catch (err) {
+        state.marker.setIcon(createCustomPinIcon(false));
+        
+        if (err.name === 'AbortError') {
+          displayError("Request Timed Out", "The geocoding service took over 8 seconds to respond. Please check your network and try again.");
+        } else {
+          displayError("Address Not Found", err.message || "Unable to resolve location. Please select a nearby street, town, or landmark.");
+        }
+      }
+    }
+
+    /**
+     * Dynamically Build Formatted Address String from Varying Country Fields
+     * Hierarchy: Road/House -> Suburb/Neighbourhood -> City/Town/Village -> State/Province -> Postcode -> Country
+     */
+    function parseAddressObject(addr) {
+      const components = [];
+      const seenNames = new Set(); // Prevent duplicates when town == suburb or state == county
+
+      const addComponent = (val) => {
+        if (!val) return;
+        const cleanVal = String(val).trim();
+        const lowerVal = cleanVal.toLowerCase();
+        if (cleanVal && !seenNames.has(lowerVal)) {
+          components.push(cleanVal);
+          seenNames.add(lowerVal);
+        }
+      };
+
+      // Tier 1: Specific Street / Road & House Number
+      const houseNum = addr.house_number || addr.building || addr.house_name || '';
+      const street = addr.road || addr.pedestrian || addr.street || addr.highway || addr.footway || 
+                     addr.path || addr.square || addr.residential || addr.place || addr.hamlet || '';
+      
+      if (houseNum && street) {
+        // Formats like "123 Main Street"
+        addComponent(`${houseNum} ${street}`);
+      } else if (street) {
+        addComponent(street);
+      } else if (houseNum) {
+        addComponent(houseNum);
+      }
+
+      // Tier 2: Suburb / Neighbourhood / Borough
+      const suburb = addr.neighbourhood || addr.suburb || addr.quarter || addr.city_district || addr.borough || addr.district;
+      addComponent(suburb);
+
+      // Tier 3: City / Town / Village / Municipality
+      const city = addr.city || addr.town || addr.village || addr.municipality || addr.county;
+      addComponent(city);
+
+      // Tier 4: State / Province / State District (Skip if absent)
+      let stateProv = addr.state || addr.province || addr.state_district || addr.region || '';
+
+      // Tier 5: Postcode / Zip Code (with Cambodia province resolution and Kandal boundary correction)
+      let postcode = addr.postcode || addr.postal_code || '';
+      
+      // Cambodia postal code fallback & Kandal boundary disambiguation (near Phnom Penh)
+      if (addr.country_code && String(addr.country_code).toLowerCase() === 'kh') {
+        const stripGaps = (s) => s.replace(/\s+/g, '');
+        
+        // Inspect all locality and administrative fields to uncover true province identity
+        const adminText = [
+          addr.province, addr.state, addr.county, addr.state_district, 
+          addr.district, addr.region, addr.municipality, addr.city, addr.town, addr.suburb, addr.borough
+        ].filter(Boolean).map(s => String(s).replace(/\bprovinces?\b/gi, '').trim()).join(' ');
+        
+        const cleanAdmin = stripGaps(adminText.toLowerCase());
+
+        // Kandal province check (including its capital Takhmau and surrounding districts often misidentified as Phnom Penh "12")
+        const isKandal = /\b(kandal|kondal|condal|takhm[a-z]+|ta\s*khm[a-z]+|kien\s*svay|angk\s*sn[u|o]l|kandal\s*stung|ponhea\s*leu|muk\s*kamp[u|o]l|s[']?aang|lvea\s*em|khsach\s*kandal|koh\s*thom|leuk\s*daek)\b/i.test(adminText);
+
+        if (isKandal) {
+          // Correct OSM state tags if they erroneously say Phnom Penh
+          if (String(stateProv).trim().toLowerCase().includes('phnom penh') || !stateProv) {
+            stateProv = 'Kandal Province';
+          }
+          // Remove any accidental "Phnom Penh" agglomeration tags from earlier address tiers
+          for (let i = components.length - 1; i >= 0; i--) {
+            if (components[i].toLowerCase().includes('phnom penh')) {
+              components.splice(i, 1);
+            }
+          }
+          // If in Kandal, override missing or mistaken Phnom Penh (12xxx) postcodes with Kandal prefix (08)
+          if (!postcode || String(postcode).trim().startsWith('12') || String(postcode).trim() === '12' || String(postcode).trim().startsWith('Postal prefix: 12')) {
+            postcode = 'Postal prefix: 08';
+          }
+        } else if (!postcode) {
+          // General province fallback for all other provinces (Phnom Penh evaluated last to prevent capturing bordering towns)
+          for (const [provinceName, prefixCode] of Object.entries(KH_PROVINCE_CODES)) {
+            const normKey = stripGaps(provinceName.toLowerCase());
+            // Safe match: exact equal or substring within clean administrative text (avoiding short false positives)
+            if (cleanAdmin === normKey || cleanAdmin.includes(normKey)) {
+              postcode = `Postal prefix: ${prefixCode}`;
+              break;
+            }
+          }
+        }
+      }
+      
+      addComponent(stateProv);
+      
+      // We purposefully exclude postcode from the main address array so it stays separated in its own field!
+
+      // Tier 6: Country
+      const country = addr.country || addr.country_name;
+      addComponent(country);
+
+      // Cleanly join without stray commas or double spaces
+      return {
+        addressText: components.join(', '),
+        postalCode: postcode ? String(postcode).trim() : ""
+      };
+    }
+
+    /**
+     * Display Success State
+     */
+    function displaySuccess(address, postalCode, coords, isFromCache = false) {
+      state.currentAddress = address;
+      state.currentPostalCode = postalCode;
+      ui.addressBox.value = address;
+      ui.postalBox.value = postalCode || "—";
+      ui.coordsText.textContent = `Lat/Lng: ${coords}`;
+      
+      // Omit the postal code line entirely rather than showing something incorrect if missing
+      if (!postalCode || postalCode === "N/A") {
+        if (ui.postalSection) ui.postalSection.style.display = "none";
+        if (ui.postalDivider) ui.postalDivider.style.display = "none";
+      } else {
+        if (ui.postalSection) ui.postalSection.style.display = "flex";
+        if (ui.postalDivider) ui.postalDivider.style.display = "block";
+      }
+      
+      if (isFromCache) {
+        ui.cacheIndicator.classList.add('visible');
+      } else {
+        ui.cacheIndicator.classList.remove('visible');
+      }
+
+      // Restore copy buttons state
+      resetCopyButtons();
+      switchState(ui.stateSuccess);
+    }
+
+    /**
+     * Display Error State
+     */
+    function displayError(title, desc) {
+      ui.errorTitle.textContent = title;
+      ui.errorDesc.textContent = desc;
+      switchState(ui.stateError);
+    }
+
+    /**
+     * Rate-Limit Cooldown Lock (1.2s)
+     */
+    function activateRateLock() {
+      state.isLocked = true;
+      ui.mapEl.classList.add('map-locked');
+      ui.statusBadge.classList.add('active');
+      ui.statusBadge.setAttribute('aria-hidden', 'false');
+
+      setTimeout(() => {
+        state.isLocked = false;
+        ui.mapEl.classList.remove('map-locked');
+        ui.statusBadge.classList.remove('active');
+        ui.statusBadge.setAttribute('aria-hidden', 'true');
+      }, CONFIG.DEBOUNCE_MS);
+    }
+
+    /**
+     * Copy to Clipboard API & Visual Feedback
+     */
+    async function copyToClipboard(text, buttonEl, defaultTextSpan = null, defaultText = "") {
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        
+        buttonEl.classList.add('copied');
+        if (buttonEl === ui.copyAddressBtn) {
+          ui.iconCopy.style.display = 'none';
+          ui.iconCheck.style.display = 'block';
+          ui.copyAddressText.textContent = 'Copied!';
+        } else {
+          buttonEl.querySelector('span').textContent = 'Copied!';
+        }
+
+        setTimeout(() => {
+          if (buttonEl === ui.copyAddressBtn) {
+            ui.iconCopy.style.display = 'block';
+            ui.iconCheck.style.display = 'none';
+            ui.copyAddressText.textContent = 'Copy Address';
+          } else {
+            buttonEl.querySelector('span').textContent = 'Copy';
+          }
+          buttonEl.classList.remove('copied');
+        }, 1500);
+
+      } catch (err) {
+        alert("Failed to copy to clipboard. Please select the text and copy manually.");
+      }
+    }
+
+    function resetCopyButtons() {
+      ui.copyAddressBtn.classList.remove('copied');
+      ui.iconCopy.style.display = 'block';
+      ui.iconCheck.style.display = 'none';
+      ui.copyAddressText.textContent = 'Copy Address';
+      ui.copyPostalBtn.classList.remove('copied');
+      ui.copyPostalBtn.querySelector('span').textContent = 'Copy';
+      ui.copyCoordsBtn.classList.remove('copied');
+      ui.copyCoordsBtn.querySelector('span').textContent = 'Copy';
+    }
+
+    /**
+     * Event Listeners for Buttons
+     */
+    ui.copyAddressBtn.addEventListener('click', () => {
+      copyToClipboard(state.currentAddress, ui.copyAddressBtn);
+    });
+
+    ui.copyPostalBtn.addEventListener('click', () => {
+      copyToClipboard(state.currentPostalCode, ui.copyPostalBtn);
+    });
+
+    ui.copyCoordsBtn.addEventListener('click', () => {
+      copyToClipboard(state.currentCoords, ui.copyCoordsBtn);
+    });
+
+    ui.locateBtn.addEventListener('click', () => {
+      attemptGeolocation(false);
+    });
+
+    // Boot Application on DOM Content Loaded
+    document.addEventListener('DOMContentLoaded', initMap);
+  </script>
+</body>
+</html>
